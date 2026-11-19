@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_2"]
+size = Vector3(0.6, 0.8, 0.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2"]
+size = Vector3(0.6, 0.8, 0.6)
+
+[node name="SillaMadera" type="StaticBody3D"]
+
+[node name="Malla" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+mesh = SubResource("BoxMesh_2")
+
+[node name="Colision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+shape = SubResource("BoxShape3D_2")

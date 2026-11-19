@@ -1,0 +1,65 @@
+{
+  "catalog_version": "2026.11.19",
+  "source_agent_repo": "C:\\Proyectos\\GodotPro-Catalog-Index\\agent-history-index",
+  "github_config": {
+    "usuario": "Vulgarcin",
+    "repositorio": "GodotPro-Catalog-Index",
+    "token_seguro": "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"
+  },
+  "entities": [
+    {
+      "id": "muro_base",
+      "categoria": "Estructuras",
+      "subcategoria": "Construccion",
+      "nombre_visual": "Muro Base",
+      "archivo": "muro_base.tscn",
+      "url_descarga": "https://githubusercontent.com/estructuras/muro_base.tscn",
+      "ruta_cache_godot": "res://catalogo_cache/estructuras/muro_base.tscn",
+      "propiedades_rejilla": {
+        "tamano_celdas_xyz": [
+          1,
+          3,
+          0.2
+        ],
+        "origen_pivote": [
+          0.5,
+          0,
+          0.5
+        ],
+        "magnetico": true
+      },
+      "comportamiento_motor": {
+        "es_muro_elastico": true,
+        "perforacion_automatica": false,
+        "tipo_colision": "Muro_CSG"
+      }
+    },
+    {
+      "id": "silla_madera",
+      "categoria": "Mobiliario",
+      "subcategoria": "Interiores",
+      "nombre_visual": "Silla Madera",
+      "archivo": "silla_madera.tscn",
+      "url_descarga": "https://githubusercontent.com/mobiliario/silla_madera.tscn",
+      "ruta_cache_godot": "res://catalogo_cache/mobiliario/silla_madera.tscn",
+      "propiedades_rejilla": {
+        "tamano_celdas_xyz": [
+          1,
+          1,
+          1
+        ],
+        "origen_pivote": [
+          0.5,
+          0,
+          0.5
+        ],
+        "magnetico": true
+      },
+      "comportamiento_motor": {
+        "es_muro_elastico": false,
+        "perforacion_automatica": false,
+        "tipo_colision": "Estatica_Solida"
+      }
+    }
+  ]
+}
