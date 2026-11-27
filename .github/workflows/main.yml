@@ -1,0 +1,33 @@
+YAML
+   name: Actualizar Catalogo Automatico
+   on:
+     workflow_dispatch:
+     schedule:
+       - cron: '0 */12 * * *'
+     push:
+       paths:
+         - 'assets/**'
+         - 'collector.py'
+   permissions:
+     contents: write
+   jobs:
+     actualizar:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+         - uses: actions/setup-python@v5
+           with:
+             python-version: '3.11'
+         - name: Ajustar ruta y ejecutar colector
+           run: |
+             sed -i 's|PATH_RAIZ = r"C:\\Proyectos\\GodotPro-Catalog-Index"|PATH_RAIZ = "."|g' collector.py
+             python collector.py
+         - name: Guardar catalogo.json
+           run: |
+             git config user.name "Supermaquina Colector"
+             git config user.email "actions@github.com"
+             git add catalogo.json
+             git diff --staged --quiet || git commit -m "Actualiza catalogo.json automatico"
+             git push
+   
+Haz clic en el botón verde Commit changes... (arriba a la derecha) y c
