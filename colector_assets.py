@@ -16,8 +16,11 @@ URL_BASE_GITHUB = "https://raw.githubusercontent.com/Vulgarcin/GodotPro-Catalog-
 MAX_ENTIDADES_CATALOGO = 5000
 MAX_TEXTURAS_CATALOGO = 5000
 
-# Repositorios públicos de GitHub para absorción automática (puedes agregar más "owner/repo")
+# Repositorios públicos de GitHub para absorción automática (casas/castillos/edificios, personas y animales)
 REPOS_GITHUB_PUBLICOS = [
+    "kayquer/kit-cidade-lowpoly",
+    "kayquer/scitizia-pessoas-64",
+    "Vuena/free-low-poly-animals-cc0",
     "KhronosGroup/glTF-Sample-Models",
     "pmndrs/three-stdlib",
 ]
@@ -50,14 +53,31 @@ def inicializar_o_cargar_catalogo():
 def clasificar_asset(raiz, id_asset):
     """Clasifica un asset en categoría y subcategoría según su carpeta y nombre."""
     ruta_baja = raiz.lower()
-    if any(k in ruta_baja or k in id_asset for k in ("personaje", "pj", "gato", "mascota", "animal", "perro", "fauna")):
+    if any(k in ruta_baja or k in id_asset for k in (
+        "personaje", "pj", "pessoa", "pessoas", "velho", "velha", "idoso", "idosa",
+        "human", "character", "avatar", "man", "woman"
+    )):
         return "Personajes", "Agentes"
-    if any(k in ruta_baja or k in id_asset for k in ("silla", "mesa", "chimenea", "mueble", "cama", "sofa", "mobiliario", "furniture")):
+    if any(k in ruta_baja or k in id_asset for k in (
+        "gato", "cat", "mascota", "animal", "perro", "fauna", "dog", "bird", "horse", "cow", "sheep"
+    )):
+        return "Personajes", "Animales"
+    if any(k in ruta_baja or k in id_asset for k in (
+        "silla", "mesa", "chimenea", "mueble", "cama", "sofa", "mobiliario", "furniture"
+    )):
         return "Mobiliario", "Interiores"
-    if any(k in ruta_baja or k in id_asset for k in ("flora", "arbol", "cesped", "planta", "arbusto")):
+    if any(k in ruta_baja or k in id_asset for k in (
+        "flora", "arbol", "arvore", "cesped", "planta", "arbusto"
+    )):
         return "Naturaleza", "Flora"
-    if any(k in ruta_baja or k in id_asset for k in ("carro", "carrito", "carroza", "vehiculo", "auto")):
+    if any(k in ruta_baja or k in id_asset for k in (
+        "carro", "carrito", "carroza", "vehiculo", "auto", "veiculo", "onibus"
+    )):
         return "Vehiculos", "Transporte"
+    if any(k in ruta_baja or k in id_asset for k in (
+        "casa", "castillo", "edificio", "house", "castle", "building", "tower", "ciudad", "city"
+    )):
+        return "Estructuras", "GrandesEstructuras"
     return "Estructuras", "Construccion"
 
 
