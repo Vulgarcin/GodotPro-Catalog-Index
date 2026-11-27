@@ -17,4 +17,3 @@
       else
         echo "Sin cambios en catalogo.json"
       fi
-
