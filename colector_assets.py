@@ -4,8 +4,8 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 
-# Rutas principales del proyecto y del catálogo
-PATH_RAIZ = r"C:\Proyectos\GodotPro-Catalog-Index"
+# Rutas principales del proyecto y del catálogo (usa el directorio actual para funcionar en PC y en GitHub Actions)
+PATH_RAIZ = os.path.abspath(".")
 PATH_JSON = os.path.join(PATH_RAIZ, "catalogo.json")
 PATH_ASSETS = os.path.join(PATH_RAIZ, "assets")
 PATH_PERSONAJES = os.path.join(PATH_ASSETS, "personajes")
