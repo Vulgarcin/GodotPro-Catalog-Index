@@ -1,19 +1,37 @@
- - name: Configurar Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: '3.11'
+name: Actualizar Catalogo Pro
 
-  - name: Ejecutar colector en la nube
-    run: python colector.py
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
 
-  - name: Guardar cambios en el repositorio de GitHub
-    run: |
-      git config --local user.email "action@github.com"
-      git config --local user.name "GitHub Action"
-      if git status --porcelain | grep -q .; then
-        git add catalogo.json
-        git commit -m "chore: actualizar catalogo.json desde la nube"
-        git push
-      else
-        echo "Sin cambios en catalogo.json"
-      fi
+permissions:
+  contents: write
+
+jobs:
+  actualizar-catalogo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Ejecutar colector en la nube
+        run: python colector.py
+
+      - name: Guardar cambios en el repositorio de GitHub
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          if git status --porcelain | grep -q .; then
+            git add catalogo.json
+            git commit -m "chore: actualizar catalogo.json desde la nube"
+            git push
+          else
+            echo "Sin cambios en catalogo.json"
+          fi
