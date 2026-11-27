@@ -1,30 +1,20 @@
-name: Actualizar Catalogo
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 */12 * * *'
-  push:
-    paths:
-      - 'assets/**'
-      - 'collector.py'
+name: Colector
+on: [workflow_dispatch]
 permissions:
   contents: write
 jobs:
-  actualizar:
+  run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Ejecutar colector
-        run: |
+      - run: |
           python -c "p=open('collector.py').read(); open('collector.py','w').write(p.replace(r'C:\Proyectos\GodotPro-Catalog-Index', '.'))"
           python collector.py
-      - name: Guardar catalogo
-        run: |
-          git config user.name "Supermaquina Colector"
+          git config user.name "Colector"
           git config user.email "actions@github.com"
           git add catalogo.json
-          git diff --staged --quiet || git commit -m "Actualiza catalogo.json"
+          git diff --staged --quiet || git commit -m "Update catalogo"
           git push
