@@ -11,8 +11,10 @@ jobs:
         with:
           python-version: '3.11'
       - run: |
-          python -c "p=open('collector.py').read(); open('collector.py','w').write(p.replace(r'C:\Proyectos\GodotPro-Catalog-Index', '.'))"
-          python collector.py
+          script=$(find . -maxdepth 3 -name "*colector*.py" | head -n 1)
+          echo "Ejecutando: $script"
+          python -c "p=open('$script').read(); open('$script','w').write(p.replace(r'C:\Proyectos\GodotPro-Catalog-Index', '.'))"
+          python "$script"
           git config user.name "Colector"
           git config user.email "actions@github.com"
           git add catalogo.json
