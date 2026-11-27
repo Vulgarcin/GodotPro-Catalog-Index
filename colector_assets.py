@@ -6,7 +6,7 @@ PATH_PERSONAJES = os.path.join(PATH_ASSETS, "personajes")
 PATH_TEXTURAS = os.path.join(PATH_ASSETS, "texturas")
 URL_BASE_GITHUB = "https://raw.githubusercontent.com/Vulgarcin/GodotPro-Catalog-Index/main"
 
-EXTENSIONES_3D = (".tscn", ".scn", ".res", ".glb", ".gltf", ".obj")
+EXTENSIONES_3D = (".tscn", ".scn", ".res", ".glb", ".gltf", ".obj", ".fbx")
 EXTENSIONES_TEXTURA = (".png", ".jpg", ".jpeg", ".webp")
 
 
