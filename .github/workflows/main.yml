@@ -1,4 +1,4 @@
-name: Actualizar Catalogo Automatico
+name: Actualizar Catalogo
 on:
   workflow_dispatch:
   schedule:
@@ -17,14 +17,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Ajustar ruta y ejecutar colector
+      - name: Ejecutar colector
         run: |
-          sed -i 's|PATH_RAIZ = r"C:\\Proyectos\\GodotPro-Catalog-Index"|PATH_RAIZ = "."|g' collector.py
+          python -c "p=open('collector.py').read(); open('collector.py','w').write(p.replace(r'C:\Proyectos\GodotPro-Catalog-Index', '.'))"
           python collector.py
-      - name: Guardar catalogo.json
+      - name: Guardar catalogo
         run: |
           git config user.name "Supermaquina Colector"
           git config user.email "actions@github.com"
           git add catalogo.json
-          git diff --staged --quiet || git commit -m "Actualiza catalogo.json automatico"
+          git diff --staged --quiet || git commit -m "Actualiza catalogo.json"
           git push
