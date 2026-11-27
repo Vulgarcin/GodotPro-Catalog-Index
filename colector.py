@@ -25,9 +25,10 @@ REPOS_GITHUB_PUBLICOS = [
     "pmndrs/three-stdlib",
 ]
 
-# Extensiones admitidas para bloques 3D y texturas
+# Extensiones admitidas para bloques 3D, texturas y vistas previas
 EXTENSIONES_3D = (".tscn", ".scn", ".res", ".glb", ".gltf", ".obj", ".fbx")
 EXTENSIONES_TEXTURA = (".png", ".jpg", ".jpeg", ".webp")
+EXTENSIONES_PREVIEW = (".png", ".jpg", ".jpeg", ".webp")
 
 
 def inicializar_o_cargar_catalogo():
@@ -95,6 +96,10 @@ def escanear_y_actualizar_assets():
     rutas_tex_existentes = {t.get("ruta_cache_godot") for t in texturas if t.get("ruta_cache_godot")}
     urls_tex_existentes = {t.get("url_descarga") for t in texturas if t.get("url_descarga")}
 
+    # Mapa de vistas previas disponibles por nombre base (sin descargar el modelo 3D)
+    previews_locales = {}
+    previews_remotos = {}
+
     # Asegura que existan las carpetas base de trabajo
     for carpeta in (PATH_ASSETS, PATH_PERSONAJES, PATH_TEXTURAS):
         if not os.path.exists(carpeta):
@@ -114,6 +119,11 @@ def escanear_y_actualizar_assets():
             archivo_bajo = archivo.lower()
             ruta_completa = os.path.join(raiz, archivo)
             ruta_relativa = os.path.relpath(ruta_completa, PATH_RAIZ).replace(os.sep, "/")
+
+            if archivo_bajo.endswith(EXTENSIONES_PREVIEW):
+                nombre_base_prev, _ = os.path.splitext(archivo)
+                clave_prev = nombre_base_prev.lower().replace(" ", "_")
+                previews_locales[clave_prev] = f"{URL_BASE_GITHUB}/{ruta_relativa}"
 
             if archivo_bajo.endswith(EXTENSIONES_3D):
                 if len(entidades) >= MAX_ENTIDADES_CATALOGO:
@@ -139,6 +149,7 @@ def escanear_y_actualizar_assets():
                 requiere_perforacion = any(k in id_asset for k in ("ventana", "puerta", "escalera"))
                 es_personaje = categoria == "Personajes"
                 celdas_xyz = [1, 3, 0.2] if es_muro else [1, 1, 1]
+                url_preview = previews_locales.get(id_base, "")
 
                 entidades.append({
                     "id": id_asset,
@@ -147,6 +158,7 @@ def escanear_y_actualizar_assets():
                     "nombre_visual": id_asset.replace("_", " ").title(),
                     "archivo": archivo,
                     "url_descarga": url_descarga,
+                    "url_preview": url_preview,
                     "ruta_cache_godot": ruta_cache,
                     "origen": "local",
                     "propiedades_rejilla": {
@@ -201,7 +213,21 @@ def escanear_y_actualizar_assets():
             req = urllib.request.Request(api_url, headers={"User-Agent": "GodotPro-Catalog-Collector"})
             with urllib.request.urlopen(req, timeout=12) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
-                for item in payload.get("tree", []):
+                arbol_repo = payload.get("tree", [])
+
+                # Primero recolecta imágenes de vista previa del repositorio sin bajar modelos
+                mapa_repo_prev = {}
+                for item in arbol_repo:
+                    if item.get("type") != "blob":
+                        continue
+                    ruta_remota = item.get("path", "")
+                    if ruta_remota.lower().endswith(EXTENSIONES_PREVIEW):
+                        base_prev, _ = os.path.splitext(os.path.basename(ruta_remota))
+                        clave_prev = base_prev.lower().replace(" ", "_")
+                        mapa_repo_prev[clave_prev] = f"https://raw.githubusercontent.com/{repo}/HEAD/{ruta_remota}"
+                previews_remotos[repo] = mapa_repo_prev
+
+                for item in arbol_repo:
                     if item.get("type") != "blob":
                         continue
                     ruta_remota = item.get("path", "")
@@ -229,6 +255,7 @@ def escanear_y_actualizar_assets():
                         es_muro = any(k in id_asset for k in ("muro", "pared", "tapiz"))
                         requiere_perforacion = any(k in id_asset for k in ("ventana", "puerta", "escalera"))
                         es_personaje = categoria == "Personajes"
+                        url_preview = previews_remotos.get(repo, {}).get(id_base, "")
 
                         entidades.append({
                             "id": id_asset,
@@ -237,6 +264,7 @@ def escanear_y_actualizar_assets():
                             "nombre_visual": id_asset.replace("_", " ").title(),
                             "archivo": archivo_remoto,
                             "url_descarga": url_raw,
+                            "url_preview": url_preview,
                             "ruta_cache_godot": ruta_cache_remota,
                             "origen": f"github:{repo}",
                             "propiedades_rejilla": {
