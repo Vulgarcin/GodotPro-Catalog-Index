@@ -4,7 +4,7 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 
-# Rutas principales del proyecto y del catálogo (usa el directorio actual para funcionar en PC y en GitHub Actions)
+# Rutas principales del proyecto y del catálogo
 PATH_RAIZ = os.path.abspath(".")
 PATH_JSON = os.path.join(PATH_RAIZ, "catalogo.json")
 PATH_ASSETS = os.path.join(PATH_RAIZ, "assets")
@@ -12,22 +12,25 @@ PATH_PERSONAJES = os.path.join(PATH_ASSETS, "personajes")
 PATH_TEXTURAS = os.path.join(PATH_ASSETS, "texturas")
 URL_BASE_GITHUB = "https://raw.githubusercontent.com/Vulgarcin/GodotPro-Catalog-Index/main"
 
-# Topes masivos configurables para evitar que el catálogo crezca sin control
+# Topes configurables para evitar que el catálogo crezca sin control
 MAX_ENTIDADES_CATALOGO = 5000
 MAX_TEXTURAS_CATALOGO = 5000
+MAX_POLYHAVEN_MODELS = 250
 
-# Repositorios públicos de GitHub para absorción automática (casas/castillos/edificios, personas y animales)
+# Repositorios públicos de GitHub con modelos modulares, animales, personajes y PBR
 REPOS_GITHUB_PUBLICOS = [
-    "kayquer/kit-cidade-lowpoly",
-    "kayquer/scitizia-pessoas-64",
-    "Vuena/free-low-poly-animals-cc0",
+    "Quaternius/Ultimate-Modular-Men-Pack",
+    "Quaternius/Ultimate-Animated-Animal-Pack",
+    "Quaternius/Ultimate-Modular-Sci-Fi-Pack",
     "KhronosGroup/glTF-Sample-Models",
+    "KhronosGroup/glTF-Sample-Assets",
     "pmndrs/three-stdlib",
 ]
 
-# Extensiones admitidas para bloques 3D y texturas
+# Extensiones admitidas para modelos 3D, texturas y vistas previas
 EXTENSIONES_3D = (".tscn", ".scn", ".res", ".glb", ".gltf", ".obj", ".fbx")
 EXTENSIONES_TEXTURA = (".png", ".jpg", ".jpeg", ".webp")
+EXTENSIONES_PREVIEW = (".png", ".jpg", ".jpeg", ".webp")
 
 
 def inicializar_o_cargar_catalogo():
@@ -50,52 +53,221 @@ def inicializar_o_cargar_catalogo():
     }
 
 
-def clasificar_asset(raiz, id_asset):
+def clasificar_asset(ruta, id_asset):
     """Clasifica un asset en categoría y subcategoría según su carpeta y nombre."""
-    ruta_baja = raiz.lower()
-    if any(k in ruta_baja or k in id_asset for k in (
-        "personaje", "pj", "pessoa", "pessoas", "velho", "velha", "idoso", "idosa",
-        "human", "character", "avatar", "man", "woman"
-    )):
-        return "Personajes", "Agentes"
-    if any(k in ruta_baja or k in id_asset for k in (
-        "gato", "cat", "mascota", "animal", "perro", "fauna", "dog", "bird", "horse", "cow", "sheep"
+    texto = f"{ruta} {id_asset}".lower()
+    if any(k in texto for k in (
+        "gato", "cat", "kitten", "felino", "mascota", "animal", "perro", "dog",
+        "zorro", "fox", "fauna", "bird", "horse", "cow", "sheep", "wolf", "deer"
     )):
         return "Personajes", "Animales"
-    if any(k in ruta_baja or k in id_asset for k in (
-        "silla", "mesa", "chimenea", "mueble", "cama", "sofa", "mobiliario", "furniture"
+    if any(k in texto for k in (
+        "personaje", "pj", "pessoa", "pessoas", "human", "character", "avatar",
+        "man", "woman", "farmer", "granjero", "pilot", "piloto", "knight", "modular_men"
+    )):
+        return "Personajes", "Agentes"
+    if any(k in texto for k in (
+        "puerta", "door", "doorway", "ventana", "window", "escalera", "stairs"
+    )):
+        return "Estructuras", "Interactuables"
+    if any(k in texto for k in (
+        "silla", "chair", "mesa", "table", "chimenea", "mueble", "cama", "bed",
+        "sofa", "couch", "mobiliario", "furniture", "cabinet", "shelf", "lamp"
     )):
         return "Mobiliario", "Interiores"
-    if any(k in ruta_baja or k in id_asset for k in (
-        "flora", "arbol", "arvore", "cesped", "planta", "arbusto"
+    if any(k in texto for k in (
+        "flora", "arbol", "tree", "arvore", "cesped", "grass", "planta", "plant", "arbusto", "rock", "roca"
     )):
         return "Naturaleza", "Flora"
-    if any(k in ruta_baja or k in id_asset for k in (
-        "carro", "carrito", "carroza", "vehiculo", "auto", "veiculo", "onibus"
+    if any(k in texto for k in (
+        "carro", "car", "carrito", "carroza", "vehiculo", "vehicle", "auto", "truck", "bus"
     )):
         return "Vehiculos", "Transporte"
-    if any(k in ruta_baja or k in id_asset for k in (
-        "casa", "castillo", "edificio", "house", "castle", "building", "tower", "ciudad", "city"
+    if any(k in texto for k in (
+        "casa", "castillo", "edificio", "house", "castle", "building", "tower",
+        "ciudad", "city", "wall", "muro", "pared", "roof", "techo", "floor", "piso"
     )):
         return "Estructuras", "GrandesEstructuras"
     return "Estructuras", "Construccion"
 
 
+def limpiar_clave_busqueda(nombre_sin_ext):
+    """Normaliza el nombre base quitando sufijos PBR comunes para emparejar modelos y texturas."""
+    clave = nombre_sin_ext.lower().replace(" ", "_").replace("-", "_")
+    sufijos_pbr = (
+        "_diffuse", "_albedo", "_basecolor", "_base_color", "_color", "_col",
+        "_normal", "_nor", "_nrm", "_roughness", "_rough", "_metallic", "_metal",
+        "_ao", "_ambientocclusion", "_height", "_bump", "_orm", "_tex", "_texture",
+        "_1k", "_2k", "_4k", "_diff"
+    )
+    for suf in sufijos_pbr:
+        if clave.endswith(suf):
+            clave = clave[: -len(suf)]
+            break
+    return clave
+
+
+def buscar_mejor_textura(id_base, carpeta_relativa, mapa_texturas_por_clave, mapa_texturas_por_carpeta):
+    """Encuentra la textura principal (Albedo/Diffuse o coincidente) y texturas PBR asociadas."""
+    clave_norm = limpiar_clave_busqueda(id_base)
+    candidatas = []
+
+    # 1. Coincidencia exacta por nombre normalizado
+    if clave_norm in mapa_texturas_por_clave:
+        candidatas.extend(mapa_texturas_por_clave[clave_norm])
+
+    # 2. Coincidencia dentro de la misma carpeta o subcarpeta inmediata
+    if carpeta_relativa in mapa_texturas_por_carpeta:
+        for tex in mapa_texturas_por_carpeta[carpeta_relativa]:
+            if tex not in candidatas:
+                candidatas.append(tex)
+
+    # 3. Coincidencia parcial por palabra clave del modelo
+    if not candidatas and len(clave_norm) >= 4:
+        for clave_tex, lista_tex in mapa_texturas_por_clave.items():
+            if clave_norm in clave_tex or clave_tex in clave_norm:
+                for tex in lista_tex:
+                    if tex not in candidatas:
+                        candidatas.append(tex)
+                if len(candidatas) >= 4:
+                    break
+
+    if not candidatas:
+        return "", []
+
+    # Priorizar mapa de color/albedo/diffuse como url_textura principal
+    url_principal = candidatas[0]
+    for url in candidatas:
+        baja = url.lower()
+        if any(tag in baja for tag in ("albedo", "diffuse", "diff", "basecolor", "base_color", "color", "_col")):
+            url_principal = url
+            break
+
+    return url_principal, candidatas[:6]
+
+
+def absorber_poly_haven(entidades, texturas, ids_existentes, urls_3d_existentes, rutas_3d_existentes, urls_tex_existentes, rutas_tex_existentes):
+    """Consulta la API pública de Poly Haven (CC0) para indexar modelos 3D .gltf y sus texturas PBR."""
+    nuevos_modelos = 0
+    nuevas_tex = 0
+    try:
+        req = urllib.request.Request(
+            "https://api.polyhaven.com/assets?t=models",
+            headers={"User-Agent": "GodotPro-Catalog-Collector"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            catalogo_ph = json.loads(resp.read().decode("utf-8"))
+    except Exception as err:
+        print(f"Aviso: No se pudo consultar Poly Haven ({err}). Continuando...")
+        return 0, 0
+
+    for asset_id, meta in list(catalogo_ph.items())[:MAX_POLYHAVEN_MODELS]:
+        if len(entidades) >= MAX_ENTIDADES_CATALOGO:
+            break
+        try:
+            req_files = urllib.request.Request(
+                f"https://api.polyhaven.com/files/{asset_id}",
+                headers={"User-Agent": "GodotPro-Catalog-Collector"}
+            )
+            with urllib.request.urlopen(req_files, timeout=10) as resp_f:
+                files_data = json.loads(resp_f.read().decode("utf-8"))
+        except Exception:
+            continue
+
+        gltf_info = files_data.get("gltf", {}).get("1k", {}).get("gltf", {})
+        url_gltf = gltf_info.get("url", "")
+        if not url_gltf or url_gltf in urls_3d_existentes:
+            continue
+
+        include_map = gltf_info.get("include", {})
+        texturas_vinculadas = []
+        url_textura_principal = ""
+
+        for rel_path, inc_info in include_map.items():
+            url_inc = inc_info.get("url", "")
+            if not url_inc:
+                continue
+            if rel_path.lower().endswith(EXTENSIONES_TEXTURA):
+                texturas_vinculadas.append(url_inc)
+                if any(tag in rel_path.lower() for tag in ("diff", "albedo", "color", "base")) and not url_textura_principal:
+                    url_textura_principal = url_inc
+
+                if len(texturas) < MAX_TEXTURAS_CATALOGO and url_inc not in urls_tex_existentes:
+                    ruta_cache_tex = f"res://catalogo_cache/remoto/polyhaven/{asset_id}/{rel_path}"
+                    texturas.append({
+                        "id": f"{asset_id}_{os.path.splitext(os.path.basename(rel_path))[0]}".lower(),
+                        "archivo": os.path.basename(rel_path),
+                        "url_descarga": url_inc,
+                        "ruta_cache_godot": ruta_cache_tex,
+                        "origen": "polyhaven:cc0",
+                    })
+                    urls_tex_existentes.add(url_inc)
+                    rutas_tex_existentes.add(ruta_cache_tex)
+                    nuevas_tex += 1
+
+        if not url_textura_principal and texturas_vinculadas:
+            url_textura_principal = texturas_vinculadas[0]
+
+        url_preview = f"https://cdn.polyhaven.com/asset_img/thumbs/{asset_id}.png?width=512"
+        categorias_ph = " ".join(meta.get("categories", []))
+        categoria, subcategoria = clasificar_asset(categorias_ph, asset_id)
+
+        id_final = f"ph_{asset_id}".lower().replace(" ", "_")
+        contador = 2
+        while id_final in ids_existentes:
+            id_final = f"ph_{asset_id}_{contador}".lower()
+            contador += 1
+
+        ruta_cache_gltf = f"res://catalogo_cache/remoto/polyhaven/{asset_id}/{asset_id}_1k.gltf"
+        es_puerta = any(k in id_final for k in ("door", "puerta"))
+        es_muro = any(k in id_final for k in ("wall", "muro", "pared"))
+        es_personaje = categoria == "Personajes"
+
+        entidades.append({
+            "id": id_final,
+            "categoria": categoria,
+            "subcategoria": subcategoria,
+            "nombre_visual": meta.get("name", asset_id.replace("_", " ").title()),
+            "archivo": f"{asset_id}_1k.gltf",
+            "url_descarga": url_gltf,
+            "url_textura": url_textura_principal,
+            "texturas_vinculadas": texturas_vinculadas,
+            "url_preview": url_preview,
+            "ruta_cache_godot": ruta_cache_gltf,
+            "origen": "polyhaven:cc0",
+            "propiedades_rejilla": {
+                "tamano_celdas_xyz": [1, 3, 0.2] if es_muro else [1, 1, 1],
+                "origen_pivote": [0.5, 0, 0.5],
+                "magnetico": not es_personaje,
+            },
+            "comportamiento_motor": {
+                "es_muro_elastico": es_muro,
+                "perforacion_automatica": es_puerta,
+                "tipo_colision": "Muro_CSG" if (es_muro or es_puerta) else ("Agente_Movil" if es_personaje else "Estatica_Solida"),
+            },
+        })
+        ids_existentes.add(id_final)
+        urls_3d_existentes.add(url_gltf)
+        rutas_3d_existentes.add(ruta_cache_gltf)
+        nuevos_modelos += 1
+
+    print(f"Poly Haven: +{nuevos_modelos} modelos PBR y +{nuevas_tex} texturas indexadas.")
+    return nuevos_modelos, nuevas_tex
+
+
 def escanear_y_actualizar_assets():
-    """Escanea archivos locales y repositorios públicos sin duplicar ni superar los topes."""
-    print("Supermaquina Colector: Iniciando escaneo de bloques 3D y texturas...")
+    """Escanea archivos locales, Poly Haven y repositorios públicos vinculando cada modelo con su textura."""
+    print("Supermaquina Colector: Iniciando escaneo de modelos 3D realistas/modulares y vinculación de texturas...")
     catalogo = inicializar_o_cargar_catalogo()
     entidades = catalogo.get("entities", [])
     texturas = catalogo.get("textures", [])
 
-    # Conjuntos de control para impedir duplicados por id, ruta en caché o URL de descarga
     ids_existentes = {e.get("id") for e in entidades if e.get("id")}
     rutas_3d_existentes = {e.get("ruta_cache_godot") for e in entidades if e.get("ruta_cache_godot")}
     urls_3d_existentes = {e.get("url_descarga") for e in entidades if e.get("url_descarga")}
     rutas_tex_existentes = {t.get("ruta_cache_godot") for t in texturas if t.get("ruta_cache_godot")}
     urls_tex_existentes = {t.get("url_descarga") for t in texturas if t.get("url_descarga")}
 
-    # Asegura que existan las carpetas base de trabajo
     for carpeta in (PATH_ASSETS, PATH_PERSONAJES, PATH_TEXTURAS):
         if not os.path.exists(carpeta):
             os.makedirs(carpeta)
@@ -105,27 +277,184 @@ def escanear_y_actualizar_assets():
     nuevas_texturas = 0
     tope_alcanzado = False
 
-    # 1. Escaneo local dentro del proyecto (omitiendo .git)
+    # 1. Absorber modelos fotorrealistas PBR desde Poly Haven (CC0)
+    ph_modelos, ph_tex = absorber_poly_haven(
+        entidades, texturas, ids_existentes, urls_3d_existentes, rutas_3d_existentes, urls_tex_existentes, rutas_tex_existentes
+    )
+    nuevos_assets += ph_modelos
+    nuevas_texturas += ph_tex
+
+    # 2. Indexar primero todas las texturas y vistas previas locales para vincularlas a los modelos
+    mapa_tex_local_clave = {}
+    mapa_tex_local_carpeta = {}
+    previews_locales = {}
+
     for raiz, _, archivos in os.walk(PATH_RAIZ):
         if ".git" in raiz.split(os.sep):
             continue
+        carpeta_rel = os.path.relpath(raiz, PATH_RAIZ).replace(os.sep, "/")
 
         for archivo in archivos:
             archivo_bajo = archivo.lower()
+            if not archivo_bajo.endswith(EXTENSIONES_TEXTURA):
+                continue
+
             ruta_completa = os.path.join(raiz, archivo)
             ruta_relativa = os.path.relpath(ruta_completa, PATH_RAIZ).replace(os.sep, "/")
+            nombre_base, _ = os.path.splitext(archivo)
+            clave_norm = limpiar_clave_busqueda(nombre_base)
+            url_tex = f"{URL_BASE_GITHUB}/{ruta_relativa}"
+            ruta_cache_tex = f"res://catalogo_cache/{ruta_relativa}"
 
-            if archivo_bajo.endswith(EXTENSIONES_3D):
-                if len(entidades) >= MAX_ENTIDADES_CATALOGO:
-                    tope_alcanzado = True
+            previews_locales[nombre_base.lower().replace(" ", "_")] = url_tex
+            mapa_tex_local_clave.setdefault(clave_norm, []).append(url_tex)
+            mapa_tex_local_carpeta.setdefault(carpeta_rel, []).append(url_tex)
+
+            if len(texturas) < MAX_TEXTURAS_CATALOGO and url_tex not in urls_tex_existentes and ruta_cache_tex not in rutas_tex_existentes:
+                texturas.append({
+                    "id": nombre_base.lower().replace(" ", "_"),
+                    "archivo": archivo,
+                    "url_descarga": url_tex,
+                    "ruta_cache_godot": ruta_cache_tex,
+                    "origen": "local",
+                })
+                urls_tex_existentes.add(url_tex)
+                rutas_tex_existentes.add(ruta_cache_tex)
+                nuevas_texturas += 1
+
+    # 3. Indexar modelos 3D locales y vincularlos con su url_textura
+    for raiz, _, archivos in os.walk(PATH_RAIZ):
+        if ".git" in raiz.split(os.sep):
+            continue
+        carpeta_rel = os.path.relpath(raiz, PATH_RAIZ).replace(os.sep, "/")
+
+        for archivo in archivos:
+            if not archivo.lower().endswith(EXTENSIONES_3D):
+                continue
+            if len(entidades) >= MAX_ENTIDADES_CATALOGO:
+                tope_alcanzado = True
+                continue
+
+            ruta_completa = os.path.join(raiz, archivo)
+            ruta_relativa = os.path.relpath(ruta_completa, PATH_RAIZ).replace(os.sep, "/")
+            nombre_base, _ = os.path.splitext(archivo)
+            id_base = nombre_base.lower().replace(" ", "_")
+            ruta_cache = f"res://catalogo_cache/{ruta_relativa}"
+            url_descarga = f"{URL_BASE_GITHUB}/{ruta_relativa}"
+
+            if ruta_cache in rutas_3d_existentes or url_descarga in urls_3d_existentes:
+                continue
+
+            id_asset = id_base
+            contador = 2
+            while id_asset in ids_existentes:
+                id_asset = f"{id_base}_{contador}"
+                contador += 1
+
+            categoria, subcategoria = clasificar_asset(raiz, id_asset)
+            es_muro = any(k in id_asset for k in ("muro", "pared", "wall"))
+            requiere_perforacion = any(k in id_asset for k in ("ventana", "window", "puerta", "door", "escalera", "stairs"))
+            es_personaje = categoria == "Personajes"
+
+            url_textura, texturas_vinculadas = buscar_mejor_textura(
+                id_base, carpeta_rel, mapa_tex_local_clave, mapa_tex_local_carpeta
+            )
+            url_preview = previews_locales.get(id_base, url_textura)
+
+            entidades.append({
+                "id": id_asset,
+                "categoria": categoria,
+                "subcategoria": subcategoria,
+                "nombre_visual": id_asset.replace("_", " ").title(),
+                "archivo": archivo,
+                "url_descarga": url_descarga,
+                "url_textura": url_textura,
+                "texturas_vinculadas": texturas_vinculadas,
+                "url_preview": url_preview,
+                "ruta_cache_godot": ruta_cache,
+                "origen": "local",
+                "propiedades_rejilla": {
+                    "tamano_celdas_xyz": [1, 3, 0.2] if es_muro else [1, 1, 1],
+                    "origen_pivote": [0.5, 0, 0.5],
+                    "magnetico": not es_personaje,
+                },
+                "comportamiento_motor": {
+                    "es_muro_elastico": es_muro,
+                    "perforacion_automatica": requiere_perforacion,
+                    "tipo_colision": "Muro_CSG" if (es_muro or requiere_perforacion) else ("Agente_Movil" if es_personaje else "Estatica_Solida"),
+                },
+            })
+            ids_existentes.add(id_asset)
+            rutas_3d_existentes.add(ruta_cache)
+            urls_3d_existentes.add(url_descarga)
+            nuevos_assets += 1
+
+    # 4. Absorción automática desde repositorios públicos de GitHub (Quaternius, Khronos, etc.)
+    for repo in REPOS_GITHUB_PUBLICOS:
+        if len(entidades) >= MAX_ENTIDADES_CATALOGO and len(texturas) >= MAX_TEXTURAS_CATALOGO:
+            tope_alcanzado = True
+            break
+        try:
+            api_url = f"https://api.github.com/repos/{repo}/git/trees/HEAD?recursive=1"
+            req = urllib.request.Request(api_url, headers={"User-Agent": "GodotPro-Catalog-Collector"})
+            with urllib.request.urlopen(req, timeout=14) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+                arbol_repo = payload.get("tree", [])
+
+            mapa_repo_tex_clave = {}
+            mapa_repo_tex_carpeta = {}
+            mapa_repo_prev = {}
+
+            # Primera pasada: recolectar todas las texturas del repo para emparejarlas con los modelos
+            for item in arbol_repo:
+                if item.get("type") != "blob":
+                    continue
+                ruta_remota = item.get("path", "")
+                if not ruta_remota.lower().endswith(EXTENSIONES_TEXTURA):
                     continue
 
-                nombre_base, _ = os.path.splitext(archivo)
-                id_base = nombre_base.lower().replace(" ", "_")
-                ruta_cache = f"res://catalogo_cache/{ruta_relativa}"
-                url_descarga = f"{URL_BASE_GITHUB}/{ruta_relativa}"
+                carpeta_remota = os.path.dirname(ruta_remota)
+                archivo_remoto = os.path.basename(ruta_remota)
+                nombre_base, _ = os.path.splitext(archivo_remoto)
+                clave_norm = limpiar_clave_busqueda(nombre_base)
+                url_raw = f"https://raw.githubusercontent.com/{repo}/HEAD/{ruta_remota}"
+                ruta_cache_remota = f"res://catalogo_cache/remoto/{repo.replace('/', '_')}/{ruta_remota}"
 
-                if ruta_cache in rutas_3d_existentes or url_descarga in urls_3d_existentes:
+                mapa_repo_prev[nombre_base.lower().replace(" ", "_")] = url_raw
+                mapa_repo_tex_clave.setdefault(clave_norm, []).append(url_raw)
+                mapa_repo_tex_carpeta.setdefault(carpeta_remota, []).append(url_raw)
+
+                if len(texturas) < MAX_TEXTURAS_CATALOGO and url_raw not in urls_tex_existentes and ruta_cache_remota not in rutas_tex_existentes:
+                    texturas.append({
+                        "id": nombre_base.lower().replace(" ", "_"),
+                        "archivo": archivo_remoto,
+                        "url_descarga": url_raw,
+                        "ruta_cache_godot": ruta_cache_remota,
+                        "origen": f"github:{repo}",
+                    })
+                    urls_tex_existentes.add(url_raw)
+                    rutas_tex_existentes.add(ruta_cache_remota)
+                    nuevas_texturas += 1
+
+            # Segunda pasada: indexar modelos 3D vinculando url_textura y texturas_vinculadas
+            for item in arbol_repo:
+                if item.get("type") != "blob":
+                    continue
+                ruta_remota = item.get("path", "")
+                if not ruta_remota.lower().endswith(EXTENSIONES_3D):
+                    continue
+                if len(entidades) >= MAX_ENTIDADES_CATALOGO:
+                    tope_alcanzado = True
+                    break
+
+                carpeta_remota = os.path.dirname(ruta_remota)
+                archivo_remoto = os.path.basename(ruta_remota)
+                nombre_base, _ = os.path.splitext(archivo_remoto)
+                id_base = nombre_base.lower().replace(" ", "_")
+                url_raw = f"https://raw.githubusercontent.com/{repo}/HEAD/{ruta_remota}"
+                ruta_cache_remota = f"res://catalogo_cache/remoto/{repo.replace('/', '_')}/{ruta_remota}"
+
+                if url_raw in urls_3d_existentes or ruta_cache_remota in rutas_3d_existentes:
                     continue
 
                 id_asset = id_base
@@ -134,23 +463,30 @@ def escanear_y_actualizar_assets():
                     id_asset = f"{id_base}_{contador}"
                     contador += 1
 
-                categoria, subcategoria = clasificar_asset(raiz, id_asset)
-                es_muro = any(k in id_asset for k in ("muro", "pared", "tapiz"))
-                requiere_perforacion = any(k in id_asset for k in ("ventana", "puerta", "escalera"))
+                categoria, subcategoria = clasificar_asset(ruta_remota, id_asset)
+                es_muro = any(k in id_asset for k in ("muro", "pared", "wall"))
+                requiere_perforacion = any(k in id_asset for k in ("ventana", "window", "puerta", "door", "escalera", "stairs"))
                 es_personaje = categoria == "Personajes"
-                celdas_xyz = [1, 3, 0.2] if es_muro else [1, 1, 1]
+
+                url_textura, texturas_vinculadas = buscar_mejor_textura(
+                    id_base, carpeta_remota, mapa_repo_tex_clave, mapa_repo_tex_carpeta
+                )
+                url_preview = mapa_repo_prev.get(id_base, url_textura)
 
                 entidades.append({
                     "id": id_asset,
                     "categoria": categoria,
                     "subcategoria": subcategoria,
                     "nombre_visual": id_asset.replace("_", " ").title(),
-                    "archivo": archivo,
-                    "url_descarga": url_descarga,
-                    "ruta_cache_godot": ruta_cache,
-                    "origen": "local",
+                    "archivo": archivo_remoto,
+                    "url_descarga": url_raw,
+                    "url_textura": url_textura,
+                    "texturas_vinculadas": texturas_vinculadas,
+                    "url_preview": url_preview,
+                    "ruta_cache_godot": ruta_cache_remota,
+                    "origen": f"github:{repo}",
                     "propiedades_rejilla": {
-                        "tamano_celdas_xyz": celdas_xyz,
+                        "tamano_celdas_xyz": [1, 3, 0.2] if es_muro else [1, 1, 1],
                         "origen_pivote": [0.5, 0, 0.5],
                         "magnetico": not es_personaje,
                     },
@@ -161,121 +497,34 @@ def escanear_y_actualizar_assets():
                     },
                 })
                 ids_existentes.add(id_asset)
-                rutas_3d_existentes.add(ruta_cache)
-                urls_3d_existentes.add(url_descarga)
+                urls_3d_existentes.add(url_raw)
+                rutas_3d_existentes.add(ruta_cache_remota)
                 nuevos_assets += 1
-                print(f"-> Indexado 3D: {id_asset} [{categoria} / {subcategoria}]")
-
-            elif archivo_bajo.endswith(EXTENSIONES_TEXTURA):
-                if len(texturas) >= MAX_TEXTURAS_CATALOGO:
-                    tope_alcanzado = True
-                    continue
-
-                ruta_cache_tex = f"res://catalogo_cache/{ruta_relativa}"
-                url_tex = f"{URL_BASE_GITHUB}/{ruta_relativa}"
-                if ruta_cache_tex in rutas_tex_existentes or url_tex in urls_tex_existentes:
-                    continue
-
-                nombre_base, _ = os.path.splitext(archivo)
-                id_tex = nombre_base.lower().replace(" ", "_")
-
-                texturas.append({
-                    "id": id_tex,
-                    "archivo": archivo,
-                    "url_descarga": url_tex,
-                    "ruta_cache_godot": ruta_cache_tex,
-                    "origen": "local",
-                })
-                rutas_tex_existentes.add(ruta_cache_tex)
-                urls_tex_existentes.add(url_tex)
-                nuevas_texturas += 1
-                print(f"-> Indexada textura: {archivo}")
-
-    # 2. Absorción automática desde repositorios públicos de GitHub (solo índices y URLs)
-    for repo in REPOS_GITHUB_PUBLICOS:
-        if len(entidades) >= MAX_ENTIDADES_CATALOGO and len(texturas) >= MAX_TEXTURAS_CATALOGO:
-            tope_alcanzado = True
-            break
-        try:
-            api_url = f"https://api.github.com/repos/{repo}/git/trees/HEAD?recursive=1"
-            req = urllib.request.Request(api_url, headers={"User-Agent": "GodotPro-Catalog-Collector"})
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                payload = json.loads(resp.read().decode("utf-8"))
-                for item in payload.get("tree", []):
-                    if item.get("type") != "blob":
-                        continue
-                    ruta_remota = item.get("path", "")
-                    baja_remota = ruta_remota.lower()
-                    archivo_remoto = os.path.basename(ruta_remota)
-                    nombre_base, _ = os.path.splitext(archivo_remoto)
-                    id_base = nombre_base.lower().replace(" ", "_")
-                    url_raw = f"https://raw.githubusercontent.com/{repo}/HEAD/{ruta_remota}"
-                    ruta_cache_remota = f"res://catalogo_cache/remoto/{repo.replace('/', '_')}/{ruta_remota}"
-
-                    if baja_remota.endswith(EXTENSIONES_3D):
-                        if len(entidades) >= MAX_ENTIDADES_CATALOGO:
-                            tope_alcanzado = True
-                            break
-                        if url_raw in urls_3d_existentes or ruta_cache_remota in rutas_3d_existentes:
-                            continue
-
-                        id_asset = id_base
-                        contador = 2
-                        while id_asset in ids_existentes:
-                            id_asset = f"{id_base}_{contador}"
-                            contador += 1
-
-                        categoria, subcategoria = clasificar_asset(ruta_remota, id_asset)
-                        es_muro = any(k in id_asset for k in ("muro", "pared", "tapiz"))
-                        requiere_perforacion = any(k in id_asset for k in ("ventana", "puerta", "escalera"))
-                        es_personaje = categoria == "Personajes"
-
-                        entidades.append({
-                            "id": id_asset,
-                            "categoria": categoria,
-                            "subcategoria": subcategoria,
-                            "nombre_visual": id_asset.replace("_", " ").title(),
-                            "archivo": archivo_remoto,
-                            "url_descarga": url_raw,
-                            "ruta_cache_godot": ruta_cache_remota,
-                            "origen": f"github:{repo}",
-                            "propiedades_rejilla": {
-                                "tamano_celdas_xyz": [1, 3, 0.2] if es_muro else [1, 1, 1],
-                                "origen_pivote": [0.5, 0, 0.5],
-                                "magnetico": not es_personaje,
-                            },
-                            "comportamiento_motor": {
-                                "es_muro_elastico": es_muro,
-                                "perforacion_automatica": requiere_perforacion,
-                                "tipo_colision": "Muro_CSG" if (es_muro or requiere_perforacion) else ("Agente_Movil" if es_personaje else "Estatica_Solida"),
-                            },
-                        })
-                        ids_existentes.add(id_asset)
-                        urls_3d_existentes.add(url_raw)
-                        rutas_3d_existentes.add(ruta_cache_remota)
-                        nuevos_assets += 1
-
-                    elif baja_remota.endswith(EXTENSIONES_TEXTURA):
-                        if len(texturas) >= MAX_TEXTURAS_CATALOGO:
-                            tope_alcanzado = True
-                            break
-                        if url_raw in urls_tex_existentes or ruta_cache_remota in rutas_tex_existentes:
-                            continue
-
-                        texturas.append({
-                            "id": id_base,
-                            "archivo": archivo_remoto,
-                            "url_descarga": url_raw,
-                            "ruta_cache_godot": ruta_cache_remota,
-                            "origen": f"github:{repo}",
-                        })
-                        urls_tex_existentes.add(url_raw)
-                        rutas_tex_existentes.add(ruta_cache_remota)
-                        nuevas_texturas += 1
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as err:
-            print(f"Aviso: No se pudo consultar {repo} ({err}). Continuando con fuentes disponibles...")
+            print(f"Aviso: No se pudo consultar {repo} ({err}). Continuando...")
         except Exception as err:
             print(f"Aviso inesperado al consultar {repo}: {err}")
+
+    # 5. Actualizar entidades previas que aún no tenían url_textura vinculada
+    mapa_global_clave = {}
+    for tex in texturas:
+        url_t = tex.get("url_descarga", "")
+        arch_t = tex.get("archivo", "")
+        if url_t and arch_t:
+            clave_t = limpiar_clave_busqueda(os.path.splitext(arch_t)[0])
+            mapa_global_clave.setdefault(clave_t, []).append(url_t)
+
+    actualizadas_tex = 0
+    for ent in entidades:
+        if not ent.get("url_textura"):
+            id_ent = ent.get("id", "")
+            url_t, lista_t = buscar_mejor_textura(id_ent, "", mapa_global_clave, {})
+            if url_t:
+                ent["url_textura"] = url_t
+                ent["texturas_vinculadas"] = lista_t
+                if not ent.get("url_preview"):
+                    ent["url_preview"] = url_t
+                actualizadas_tex += 1
 
     catalogo["entities"] = entidades
     catalogo["textures"] = texturas
@@ -285,20 +534,20 @@ def escanear_y_actualizar_assets():
         "tope_alcanzado": tope_alcanzado,
     }
 
-    if nuevos_assets > 0 or nuevas_texturas > 0:
+    if nuevos_assets > 0 or nuevas_texturas > 0 or actualizadas_tex > 0:
         catalogo["catalog_version"] = datetime.now().strftime("%Y.%m.%d")
         with open(PATH_JSON, "w", encoding="utf-8") as f:
             json.dump(catalogo, f, indent=2, ensure_ascii=False)
-        print(f"Listo! {nuevos_assets} bloques 3D y {nuevas_texturas} texturas nuevas guardados en catalogo.json.")
+        print(
+            f"Listo! +{nuevos_assets} modelos 3D, +{nuevas_texturas} texturas y "
+            f"{actualizadas_tex} modelos vinculados con url_textura en catalogo.json."
+        )
     else:
-        print("El catalogo esta al dia. Mete modelos 3D o texturas o agrega repositorios para indexarlos.")
-
-    if tope_alcanzado:
-        print(f"Tope masivo alcanzado ({MAX_ENTIDADES_CATALOGO} entidades / {MAX_TEXTURAS_CATALOGO} texturas). No se añadieron extras.")
+        print("El catálogo ya está actualizado con todas sus texturas vinculadas.")
 
 
 if __name__ == "__main__":
     try:
         escanear_y_actualizar_assets()
     except Exception as exc:
-        print(f"Error crítico en Supermaquina Colector: {exc}")
+        print(f"Error crítico en colector_assets.py: {exc}")
